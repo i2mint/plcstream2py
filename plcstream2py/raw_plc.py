@@ -2,7 +2,8 @@ import ctypes
 from contextlib import suppress
 from dataclasses import dataclass
 from pprint import pprint
-from typing import List, Optional, Callable
+from typing import List, Optional
+from collections.abc import Callable
 
 from snap7.common import check_error
 from snap7.exceptions import Snap7Exception
@@ -125,7 +126,7 @@ class PlcRawRead:
 
     @classmethod
     def todict(cls, struct):
-        return dict((field, getattr(struct, field)) for field, _ in struct._fields_)
+        return {field: getattr(struct, field) for field, _ in struct._fields_}
 
     def get_info(self):
         if self._plc.get_connected():
@@ -147,10 +148,10 @@ class PlcRawRead:
 
         self._plc.destroy()
 
-    def write_items(self, items: List[PlcDataItem]) -> bool:
+    def write_items(self, items: list[PlcDataItem]) -> bool:
         return False
 
-    def read_items(self, items: List[PlcDataItem]) -> List[dict] or None:
+    def read_items(self, items: list[PlcDataItem]) -> list[dict] or None:
 
         _items = (S7DataItem * len(items))()
         for _i in range(0, len(items)):

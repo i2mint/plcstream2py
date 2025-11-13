@@ -23,7 +23,7 @@ class PlcReader(SourceReader):
         self,
         ip_address: str,
         *,
-        items_to_read: List[PlcDataItem],
+        items_to_read: list[PlcDataItem],
         rack: int,
         slot: int,
         tcp_port: int = 102,
@@ -85,7 +85,7 @@ class PlcReader(SourceReader):
             return True
         return False
 
-    def read(self, blocking: bool = False, timeout: int = 0) -> Optional[Any]:
+    def read(self, blocking: bool = False, timeout: int = 0) -> Any | None:
         """
         :return: timestamp, plc info, read db items as key:value
         """
