@@ -1,4 +1,17 @@
+"""Thin, snap7-level access to values stored in a Siemens S7 PLC.
+
+:class:`PlcDataItem` describes a single value to read -- where it lives in the PLC
+(area, word length, DB number, start offset, amount) and how to turn the bytes that
+come back into a Python value. :class:`PlcRawRead` connects to a PLC and reads a list
+of those items in one multi-variable request.
+
+This module targets the ``python-snap7`` 1.x API (``snap7.types``, ``snap7.common``,
+``snap7.exceptions``); see ``setup.cfg`` for the pin. :mod:`plcstream2py.plc` builds
+the streaming interface on top of it.
+"""
+
 import ctypes
+import logging
 from contextlib import suppress
 from dataclasses import dataclass
 from pprint import pprint
@@ -19,6 +32,8 @@ from snap7.types import (
 
 from stream2py import SourceReader
 import snap7
+
+logger = logging.getLogger(__name__)
 
 
 def get_byte(_bytearray, byte_index):
@@ -75,12 +90,16 @@ class PlcDataItem:
 
         assert _size != 0, 'Unknown word len'
 
-        print(f'PlcDataItem {self.key}: size = {_size}, amount = {self.amount}')
+        logger.debug(
+            'PlcDataItem %s: size = %s, amount = %s', self.key, _size, self.amount
+        )
 
         try:
             self.buffer = ctypes.create_string_buffer(_size * self.amount)
         except Exception as ex:
-            print(f'ERROR: Failed to allocate string buffer for item {self.key} : {ex}')
+            logger.error(
+                'Failed to allocate string buffer for item %s: %s', self.key, ex
+            )
             return
 
         try:
@@ -88,6 +107,7 @@ class PlcDataItem:
                 ctypes.pointer(self.buffer), ctypes.POINTER(ctypes.c_uint8)
             )
         except Exception as ex:
+            logger.error('Failed to cast buffer for item %s: %s', self.key, ex)
             return
 
     def get_item(self):
