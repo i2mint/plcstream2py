@@ -1,3 +1,14 @@
+"""A ``stream2py`` source reader for Siemens S7 PLC data.
+
+:class:`PlcReader` wraps :class:`plcstream2py.raw_plc.PlcRawRead` in a
+``stream2py.SourceReader``: opening it starts a background thread that polls the PLC
+for a fixed list of :class:`plcstream2py.raw_plc.PlcDataItem` values, and ``read``
+pops the readings that have accumulated since the last call.
+
+Importing this module needs ``python-snap7`` (which wraps the native ``snap7``
+library); reading anything from it also needs a reachable PLC.
+"""
+
 import threading
 import time
 from asyncio import Queue
@@ -9,9 +20,9 @@ import snap7
 from snap7.types import S7AreaDB, S7WLReal, S7WLBit, S7WLByte
 
 from stream2py import SourceReader
-from stream2py.sources.raw_plc import PlcRawRead, PlcDataItem, get_byte
-
 from stream2py.utility.typing_hints import ComparableType
+
+from plcstream2py.raw_plc import PlcRawRead, PlcDataItem, get_byte
 
 
 class PlcReader(SourceReader):
