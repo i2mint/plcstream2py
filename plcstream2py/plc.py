@@ -9,9 +9,9 @@ import snap7
 from snap7.types import S7AreaDB, S7WLReal, S7WLBit, S7WLByte
 
 from stream2py import SourceReader
-from stream2py.sources.raw_plc import PlcRawRead, PlcDataItem, get_byte
-
 from stream2py.utility.typing_hints import ComparableType
+
+from plcstream2py.raw_plc import PlcRawRead, PlcDataItem, get_byte
 
 
 class PlcReader(SourceReader):
