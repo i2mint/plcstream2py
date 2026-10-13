@@ -80,7 +80,9 @@ def _missing_snap7_attributes():
     """The ``SNAP7_ATTRIBUTES_USED`` entries the importable ``snap7`` does not have."""
     return [
         f'{module_name}.{attribute}'
-        for module_name, attributes in SNAP7_ATTRIBUTES_USED[_installed_layout()].items()
+        for module_name, attributes in SNAP7_ATTRIBUTES_USED[
+            _installed_layout()
+        ].items()
         for attribute in attributes
         if not hasattr(importlib.import_module(module_name), attribute)
     ]

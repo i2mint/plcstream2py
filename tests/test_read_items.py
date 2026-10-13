@@ -26,8 +26,13 @@ from conftest import INSTALLED_SNAP7_LAYOUT, snap7_env
 #: What the fake PLC holds in DB 1: byte 0 = 0b10 (bit 0 clear, bit 1 set), a byte at
 #: 3 and 4, a big-endian REAL 3.5 at 8, a big-endian WORD 0x1234 at 12, and bytes 14-15
 #: for a multi-bit read that crosses a byte boundary (bits 118, 119, 120 are 1, 1, 1).
-MEMORY = {1: bytearray(b'\x02\x00\x00\x4d\xc8\x00\x00\x00' + struct.pack('>f', 3.5)
-                       + b'\x12\x34\xc0\x01')}
+MEMORY = {
+    1: bytearray(
+        b'\x02\x00\x00\x4d\xc8\x00\x00\x00'
+        + struct.pack('>f', 3.5)
+        + b'\x12\x34\xc0\x01'
+    )
+}
 
 #: ``(key, expected value)`` for the items built by :func:`_data_items`.
 EXPECTED = {'led': True, 'motor': False, 'speed': 77, 'real': 3.5, 'word': 0x1234}
@@ -81,7 +86,9 @@ class _PurePythonClient:
         self.memory, self.calls = memory, []
 
     def read_multi_vars(self, items):
-        raise AssertionError('the word-length-blind multi-variable read must not be used')
+        raise AssertionError(
+            'the word-length-blind multi-variable read must not be used'
+        )
 
     def read_area(self, area, db_number, start, size, word_len=None):
         assert word_len is None, 'a typed read_area returns nothing for bits and reals'
@@ -97,7 +104,9 @@ def flavour(request, monkeypatch):
         compat = importlib.import_module('plcstream2py.snap7_compat')
         pure_python = kind == 'pure-python'
         monkeypatch.setattr(compat, '_is_pure_python_client', lambda: pure_python)
-        yield request.param, (_PurePythonClient if pure_python else _NativeClient)(MEMORY)
+        yield request.param, (_PurePythonClient if pure_python else _NativeClient)(
+            MEMORY
+        )
 
 
 def _raw_reader(client):
@@ -111,7 +120,11 @@ def _raw_reader(client):
 def _data_items():
     from plcstream2py.raw_plc import PlcDataItem, get_byte
     from plcstream2py.snap7_compat import (
-        S7AreaDB, S7WLBit, S7WLByte, S7WLReal, S7WLWord,
+        S7AreaDB,
+        S7WLBit,
+        S7WLByte,
+        S7WLReal,
+        S7WLWord,
     )
 
     def item(word_len, start, key, convert, convert_args, amount=1):
@@ -137,7 +150,11 @@ def test_every_flavour_reads_the_same_values(flavour):
     assert all('bt' in r for r in read)
     if name == 'modern-pure-python':  # bits via the byte holding them, no word lengths
         assert client.calls == [
-            (0x84, 1, 0, 1), (0x84, 1, 0, 1), (0x84, 1, 3, 1), (0x84, 1, 8, 4), (0x84, 1, 12, 2),
+            (0x84, 1, 0, 1),
+            (0x84, 1, 0, 1),
+            (0x84, 1, 3, 1),
+            (0x84, 1, 8, 4),
+            (0x84, 1, 12, 2),
         ]
     else:  # one request for everything, word lengths and bit offsets intact
         assert client.calls == [

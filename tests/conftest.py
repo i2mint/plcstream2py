@@ -43,9 +43,7 @@ REAL_SNAP7_INSTALLED = importlib.util.find_spec('snap7') is not None
 INSTALLED_SNAP7_LAYOUT = (
     None
     if not REAL_SNAP7_INSTALLED
-    else 'modern'
-    if importlib.util.find_spec('snap7.type')
-    else 'legacy'
+    else 'modern' if importlib.util.find_spec('snap7.type') else 'legacy'
 )
 
 #: Area and word-length codes, mirroring the values ``snap7.types`` exposes.
@@ -180,7 +178,9 @@ def _build_snap7_stub(layout='legacy'):
         submodules = dict(
             client=module('snap7.client', Client=_Client),
             error=module('snap7.error', check_error=check_error),
-            type=module('snap7.type', S7DataItem=_S7DataItem, Area=_Area, WordLen=_WordLen),
+            type=module(
+                'snap7.type', S7DataItem=_S7DataItem, Area=_Area, WordLen=_WordLen
+            ),
             util=util,
         )
     snap7 = module(
