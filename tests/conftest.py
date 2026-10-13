@@ -43,7 +43,9 @@ REAL_SNAP7_INSTALLED = importlib.util.find_spec('snap7') is not None
 INSTALLED_SNAP7_LAYOUT = (
     None
     if not REAL_SNAP7_INSTALLED
-    else 'modern' if importlib.util.find_spec('snap7.type') else 'legacy'
+    else 'modern'
+    if importlib.util.find_spec('snap7.type')
+    else 'legacy'
 )
 
 #: Area and word-length codes, mirroring the values ``snap7.types`` exposes.
