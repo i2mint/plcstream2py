@@ -248,21 +248,27 @@ def stubbed_snap7(request):
         yield request.param
 
 
-@pytest.fixture(params=SNAP7_LAYOUTS)
-def snap7_layout(request):
-    """Run the test once per ``python-snap7`` layout; the value is the layout name.
+@contextmanager
+def snap7_env(layout):
+    """Run the block with a ``snap7`` of the given layout importable.
 
     Uses the genuine library when the installed one has that layout, the stand-in
     otherwise -- so every layout is exercised on every machine, and against the real
-    thing wherever it is installed.
+    thing wherever it is installed. Leaves ``sys.modules`` as it found it.
     """
-    layout = request.param
     if INSTALLED_SNAP7_LAYOUT == layout:
         with _modules_reimported(_RELOADED_PACKAGES):
-            yield layout
+            yield
     else:
         with snap7_stub_installed(layout):
-            yield layout
+            yield
+
+
+@pytest.fixture(params=SNAP7_LAYOUTS)
+def snap7_layout(request):
+    """Run the test once per ``python-snap7`` layout; the value is the layout name."""
+    with snap7_env(request.param):
+        yield request.param
 
 
 @pytest.fixture

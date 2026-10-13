@@ -20,14 +20,15 @@ Reading is the one behavioural difference worth a seam. The legacy and 2.x clien
 hand an array of ``S7DataItem`` to the native library's multi-variable read, which
 honours each item's ``WordLen`` (a *bit* item addresses a single bit). The 3.x
 client accepts the same array but reads every item as plain bytes, ignoring
-``WordLen`` -- a bit item would silently return the byte at the bit offset. So
-:func:`read_data_items` reads item by item through ``Client.read_area(...,
-word_len=...)`` whenever the client supports that, and uses ``read_multi_vars``
-otherwise.
+``WordLen`` -- a bit item would silently return the byte at the bit offset -- and its
+typed ``read_area(..., word_len=...)`` mis-parses the bit and real answers a PLC
+sends (it returns no data). So on the pure-Python 3.x client :func:`read_data_items`
+reads plain bytes and does the bit extraction itself; everywhere else it uses
+``read_multi_vars``.
 """
 
-import inspect
 from importlib import import_module
+from importlib.util import find_spec
 
 import snap7
 
@@ -68,26 +69,43 @@ check_error = _error.check_error
 WORD_LEN_BYTES = {S7WLBit: 1, S7WLByte: 1, S7WLWord: 2, S7WLDWord: 4, S7WLReal: 8}
 
 
-def _read_area_takes_word_len(client) -> bool:
-    """Whether ``client.read_area`` can be told the word length (python-snap7 3.x)."""
+#: Bytes one element occupies on the wire (differs from the buffer size for ``Real``).
+_WIRE_BYTES = {S7WLBit: 1, S7WLByte: 1, S7WLWord: 2, S7WLDWord: 4, S7WLReal: 4}
+
+
+def _is_pure_python_client() -> bool:
+    """Whether ``snap7`` is the 3.x line, whose client speaks S7 in pure Python.
+
+    ``snap7.s7protocol`` exists there and nowhere else, and it is that protocol
+    implementation that makes ``read_multi_vars`` blind to word lengths.
+    """
     try:
-        return 'word_len' in inspect.signature(client.read_area).parameters
-    except (AttributeError, TypeError, ValueError):
+        return find_spec('snap7.s7protocol') is not None
+    except (ImportError, ValueError):
         return False
 
 
-def _read_item_via_read_area(client, item) -> None:
-    """Fill ``item.pData`` using ``read_area``, honouring the item's word length."""
-    data = client.read_area(
-        _types.Area(item.Area),
-        item.DBNumber,
-        item.Start,
-        item.Amount,
-        word_len=_types.WordLen(item.WordLen),
-    )
-    capacity = WORD_LEN_BYTES[item.WordLen] * item.Amount
-    for index, byte in enumerate(bytes(data)[:capacity]):
-        item.pData[index] = byte
+def _read_item_as_bytes(client, item) -> None:
+    """Fill ``item.pData`` from plain byte reads, as the native word-length-aware read would.
+
+    For a bit item, ``Start`` is a bit offset and each of the ``Amount`` bits lands in
+    its own buffer byte as 0/1. For the rest, ``Start`` is a byte offset and the
+    ``Amount`` elements' bytes are copied as the PLC sent them.
+    """
+    area = _types.Area(item.Area)
+    if item.WordLen == S7WLBit:
+        first_bit = item.Start % 8
+        data = client.read_area(
+            area, item.DBNumber, item.Start // 8, (first_bit + item.Amount + 7) // 8
+        )
+        for index in range(item.Amount):
+            byte, bit = divmod(first_bit + index, 8)
+            item.pData[index] = data[byte] >> bit & 1
+    else:
+        size = _WIRE_BYTES[item.WordLen] * item.Amount
+        data = client.read_area(area, item.DBNumber, item.Start, size)
+        for index, byte in enumerate(bytes(data)[:size]):
+            item.pData[index] = byte
     item.Result = 0
 
 
@@ -99,9 +117,9 @@ def read_data_items(client, items):
     multi-variable read reports a non-zero status; a failed per-item read raises,
     as the client's own errors do.
     """
-    if _read_area_takes_word_len(client):
+    if _is_pure_python_client():
         for item in items:
-            _read_item_via_read_area(client, item)
+            _read_item_as_bytes(client, item)
         return items
     result, items_read = client.read_multi_vars(items)
     return None if result else items_read
