@@ -5,9 +5,9 @@
 come back into a Python value. :class:`PlcRawRead` connects to a PLC and reads a list
 of those items in one multi-variable request.
 
-This module targets the ``python-snap7`` 1.x API (``snap7.types``, ``snap7.common``,
-``snap7.exceptions``); see ``setup.cfg`` for the pin. :mod:`plcstream2py.plc` builds
-the streaming interface on top of it.
+It works with ``python-snap7`` 1.x, 2.x and 3.x: the names that moved between them
+come from :mod:`plcstream2py.snap7_compat`. :mod:`plcstream2py.plc` builds the
+streaming interface on top of it.
 """
 
 import ctypes
@@ -18,9 +18,8 @@ from pprint import pprint
 from typing import List, Optional
 from collections.abc import Callable
 
-from snap7.common import check_error
-from snap7.exceptions import Snap7Exception
-from snap7.types import (
+from plcstream2py.snap7_compat import (
+    SNAP7_ERRORS,
     S7DataItem,
     S7AreaDB,
     S7WLBit,
@@ -28,6 +27,9 @@ from snap7.types import (
     S7WLByte,
     S7WLWord,
     S7WLDWord,
+    WORD_LEN_BYTES,
+    check_error,
+    read_data_items,
 )
 
 from stream2py import SourceReader
@@ -78,15 +80,7 @@ class PlcDataItem:
         self.convert_args = convert_args
 
         # allocate memory for data
-        _size = 0
-        if self.word_len in [S7WLBit, S7WLByte]:
-            _size = 1
-        elif self.word_len == S7WLWord:
-            _size = 2
-        elif self.word_len == S7WLDWord:
-            _size = 4
-        elif self.word_len == S7WLReal:
-            _size = 8
+        _size = WORD_LEN_BYTES.get(self.word_len, 0)
 
         assert _size != 0, 'Unknown word len'
 
@@ -151,13 +145,13 @@ class PlcRawRead:
     def get_info(self):
         if self._plc.get_connected():
 
-            with suppress(Snap7Exception):
+            with suppress(*SNAP7_ERRORS):
                 self.plc_info.update(cpu_info=self.todict(self._plc.get_cpu_info()))
 
-            with suppress(Snap7Exception):
+            with suppress(*SNAP7_ERRORS):
                 self.plc_info.update(cpu_state=self._plc.get_cpu_state())
 
-            with suppress(Snap7Exception):
+            with suppress(*SNAP7_ERRORS):
                 self.plc_info.update(pdu_len=self._plc.get_pdu_length())
 
         return self.plc_info
@@ -177,8 +171,8 @@ class PlcRawRead:
         for _i in range(0, len(items)):
             _items[_i] = items[_i].get_item()
 
-        result, items_read = self._plc.read_multi_vars(_items)
-        if result:
+        items_read = read_data_items(self._plc, _items)
+        if items_read is None:
             return None
 
         _bt = SourceReader.get_timestamp()

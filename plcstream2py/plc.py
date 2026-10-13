@@ -17,7 +17,7 @@ from pprint import pprint
 from typing import List, Optional, Any
 
 import snap7
-from snap7.types import S7AreaDB, S7WLReal, S7WLBit, S7WLByte
+from plcstream2py.snap7_compat import S7AreaDB, S7WLReal, S7WLBit, S7WLByte
 
 from stream2py import SourceReader
 from stream2py.utility.typing_hints import ComparableType
