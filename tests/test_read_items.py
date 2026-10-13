@@ -24,13 +24,10 @@ import pytest
 from conftest import INSTALLED_SNAP7_LAYOUT, snap7_env
 
 #: What the fake PLC holds in DB 1: byte 0 = 0b10 (bit 0 clear, bit 1 set), a byte at
-#: 3 and 4, a big-endian REAL 3.5 at 8, a big-endian WORD 0x1234 at 12, and bytes 14-15
-#: for a multi-bit read that crosses a byte boundary (bits 118, 119, 120 are 1, 1, 1).
+#: 3 and 4, a big-endian REAL 3.5 at 8, a big-endian WORD 0x1234 at 12.
 MEMORY = {
     1: bytearray(
-        b'\x02\x00\x00\x4d\xc8\x00\x00\x00'
-        + struct.pack('>f', 3.5)
-        + b'\x12\x34\xc0\x01'
+        b'\x02\x00\x00\x4d\xc8\x00\x00\x00' + struct.pack('>f', 3.5) + b'\x12\x34'
     )
 }
 
@@ -162,17 +159,29 @@ def test_every_flavour_reads_the_same_values(flavour):
         ]
 
 
-def test_multi_bit_reads_cross_byte_boundaries_alike(flavour):
+def test_a_bit_item_reads_exactly_one_bit(flavour):
+    """The S7 protocol allows one bit per item: the native library rejects more."""
     from plcstream2py.raw_plc import PlcDataItem
     from plcstream2py.snap7_compat import S7AreaDB, S7WLBit
 
-    def bits(buffer, byte_index):
-        return [buffer[i] for i in range(3)]
+    if flavour[0] != 'modern-pure-python':
+        pytest.skip('the native library does the rejecting')
+    item = PlcDataItem(S7AreaDB, S7WLBit, 1, 14 * 8 + 6, 3, 'bits', list, ())
+    with pytest.raises(ValueError, match='exactly one bit'):
+        _raw_reader(flavour[1]).read_items([item])
 
-    # bits 118, 119 (byte 14) and 120 (byte 15)
-    item = PlcDataItem(S7AreaDB, S7WLBit, 1, 14 * 8 + 6, 3, 'bits', bits, (0,))
-    read = _raw_reader(flavour[1]).read_items([item])
-    assert read[0]['value'] == [1, 1, 1]
+
+def test_a_short_answer_raises():
+    class _Short(_PurePythonClient):
+        def read_area(self, area, db_number, start, size, word_len=None):
+            return bytearray(size - 1)
+
+    with snap7_env('modern'):
+        compat = importlib.import_module('plcstream2py.snap7_compat')
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(compat, '_is_pure_python_client', lambda: True)
+            with pytest.raises(RuntimeError, match='expected 2 bytes'):
+                _raw_reader(_Short(MEMORY)).read_items(_data_items()[-1:])
 
 
 def test_a_failed_multi_var_read_gives_none(snap7_layout, monkeypatch):

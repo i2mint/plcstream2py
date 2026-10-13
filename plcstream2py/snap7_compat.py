@@ -88,24 +88,25 @@ def _is_pure_python_client() -> bool:
 def _read_item_as_bytes(client, item) -> None:
     """Fill ``item.pData`` from plain byte reads, as the native word-length-aware read would.
 
-    For a bit item, ``Start`` is a bit offset and each of the ``Amount`` bits lands in
-    its own buffer byte as 0/1. For the rest, ``Start`` is a byte offset and the
-    ``Amount`` elements' bytes are copied as the PLC sent them.
+    For a bit item, ``Start`` is a bit offset and the one bit lands in the first buffer
+    byte as 0/1 (the S7 protocol allows a single bit per item, and the native library
+    rejects more). For the rest, ``Start`` is a byte offset and the ``Amount`` elements'
+    bytes are copied as the PLC sent them.
     """
     area = _types.Area(item.Area)
     if item.WordLen == S7WLBit:
-        first_bit = item.Start % 8
-        data = client.read_area(
-            area, item.DBNumber, item.Start // 8, (first_bit + item.Amount + 7) // 8
-        )
-        for index in range(item.Amount):
-            byte, bit = divmod(first_bit + index, 8)
-            item.pData[index] = data[byte] >> bit & 1
+        if item.Amount != 1:
+            raise ValueError(f'a bit item reads exactly one bit, not {item.Amount}')
+        data = client.read_area(area, item.DBNumber, item.Start // 8, 1)
+        size, values = 1, [data[0] >> item.Start % 8 & 1]
     else:
         size = _WIRE_BYTES[item.WordLen] * item.Amount
         data = client.read_area(area, item.DBNumber, item.Start, size)
-        for index, byte in enumerate(bytes(data)[:size]):
-            item.pData[index] = byte
+        values = bytes(data)
+    if len(values) < size:
+        raise RuntimeError(f'expected {size} bytes from the PLC, got {len(values)}')
+    for index, byte in enumerate(values[:size]):
+        item.pData[index] = byte
     item.Result = 0
 
 
