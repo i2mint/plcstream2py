@@ -25,6 +25,11 @@ typed ``read_area(..., word_len=...)`` mis-parses the bit and real answers a PLC
 sends (it returns no data). So on the pure-Python 3.x client :func:`read_data_items`
 reads plain bytes and does the bit extraction itself; everywhere else it uses
 ``read_multi_vars``.
+
+The plain-byte reads go out together when the 3.x client has the dict-based
+``read_multi_vars`` (recognised by its ``use_optimizer`` attribute): its (experimental)
+optimizer merges adjacent items and packs them into few PDUs. Older 3.x clients get
+one round trip per item.
 """
 
 from importlib import import_module
@@ -85,6 +90,59 @@ def _is_pure_python_client() -> bool:
         return False
 
 
+def _supports_batched_reads(client) -> bool:
+    """Whether ``client.read_multi_vars`` takes dict requests (python-snap7 >= 3.2)."""
+    return hasattr(client, 'use_optimizer')
+
+
+def _byte_request(item) -> tuple[int, int]:
+    """``(byte offset, byte count)`` that carries ``item`` on a plain byte read."""
+    if item.WordLen == S7WLBit:
+        if item.Amount != 1:
+            raise ValueError(f'a bit item reads exactly one bit, not {item.Amount}')
+        return item.Start // 8, 1
+    return item.Start, _WIRE_BYTES[item.WordLen] * item.Amount
+
+
+def _fill_item(item, data) -> None:
+    """Fill ``item.pData`` from the plain bytes ``data`` read for :func:`_byte_request`."""
+    if item.WordLen == S7WLBit:
+        size, values = 1, [data[0] >> item.Start % 8 & 1] if len(data) else []
+    else:
+        size, values = _WIRE_BYTES[item.WordLen] * item.Amount, bytes(data)
+    if len(values) < size:
+        raise RuntimeError(f'expected {size} bytes from the PLC, got {len(values)}')
+    for index, byte in enumerate(values[:size]):
+        item.pData[index] = byte
+    item.Result = 0
+
+
+def _read_items_batched(client, items) -> None:
+    """Read all ``items`` as plain bytes through the 3.x dict-based ``read_multi_vars``.
+
+    Requests go out in chunks of the client's ``MAX_VARS``; each chunk's answers come
+    back in request order.
+    """
+    chunk = getattr(client, 'MAX_VARS', 20)
+    items = list(items)
+    for lo in range(0, len(items), chunk):
+        batch = items[lo : lo + chunk]
+        requests = []
+        for item in batch:
+            start, size = _byte_request(item)
+            requests.append(
+                {
+                    'area': _types.Area(item.Area),
+                    'db_number': item.DBNumber,
+                    'start': start,
+                    'size': size,
+                }
+            )
+        _, answers = client.read_multi_vars(requests)
+        for item, data in zip(batch, answers):
+            _fill_item(item, data)
+
+
 def _read_item_as_bytes(client, item) -> None:
     """Fill ``item.pData`` from plain byte reads, as the native word-length-aware read would.
 
@@ -93,21 +151,8 @@ def _read_item_as_bytes(client, item) -> None:
     rejects more). For the rest, ``Start`` is a byte offset and the ``Amount`` elements'
     bytes are copied as the PLC sent them.
     """
-    area = _types.Area(item.Area)
-    if item.WordLen == S7WLBit:
-        if item.Amount != 1:
-            raise ValueError(f'a bit item reads exactly one bit, not {item.Amount}')
-        data = client.read_area(area, item.DBNumber, item.Start // 8, 1)
-        size, values = 1, [data[0] >> item.Start % 8 & 1]
-    else:
-        size = _WIRE_BYTES[item.WordLen] * item.Amount
-        data = client.read_area(area, item.DBNumber, item.Start, size)
-        values = bytes(data)
-    if len(values) < size:
-        raise RuntimeError(f'expected {size} bytes from the PLC, got {len(values)}')
-    for index, byte in enumerate(values[:size]):
-        item.pData[index] = byte
-    item.Result = 0
+    start, size = _byte_request(item)
+    _fill_item(item, client.read_area(_types.Area(item.Area), item.DBNumber, start, size))
 
 
 def read_data_items(client, items):
@@ -119,6 +164,9 @@ def read_data_items(client, items):
     as the client's own errors do.
     """
     if _is_pure_python_client():
+        if _supports_batched_reads(client):
+            _read_items_batched(client, items)
+            return items
         for item in items:
             _read_item_as_bytes(client, item)
         return items

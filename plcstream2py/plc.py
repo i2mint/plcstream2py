@@ -9,6 +9,7 @@ Importing this module needs ``python-snap7`` (which wraps the native ``snap7``
 library); reading anything from it also needs a reachable PLC.
 """
 
+import logging
 import threading
 import time
 from asyncio import Queue
@@ -23,12 +24,18 @@ from stream2py import SourceReader
 from stream2py.utility.typing_hints import ComparableType
 
 from plcstream2py.raw_plc import PlcRawRead, PlcDataItem, get_byte
+from plcstream2py.snap7_compat import SNAP7_ERRORS
+
+logger = logging.getLogger(__name__)
 
 
 class PlcReader(SourceReader):
     """
         TODO: Finish class implementation
     """
+
+    #: Least wait (s) after a failed poll, so ``sleep_time=0`` cannot spin on errors.
+    MIN_RETRY_WAIT_S = 0.1
 
     def __init__(
         self,
@@ -68,6 +75,7 @@ class PlcReader(SourceReader):
         self._data_read_thread_exit.clear()
         self.data = deque()  # Queue()
         self.plc_info = dict()
+        self.last_error = None  # the client error of the latest failed poll, else None
 
         self.reader_thread = None
 
@@ -75,7 +83,18 @@ class PlcReader(SourceReader):
         _sleep_time = self.sleep_time_on_read_none_s
 
         while not self._data_read_thread_exit.is_set():
-            data_item = self._plc_raw_reader.read_items(self._items_to_read)
+            try:
+                data_item = self._plc_raw_reader.read_items(self._items_to_read)
+            except SNAP7_ERRORS as error:
+                # A failed poll (e.g. a dropped connection, which python-snap7 3.x raises as
+                # an ``S7Error``) must not kill the thread silently: the reader would then
+                # look alive and never produce data again. Record it, skip this poll, and
+                # try again after the usual sleep.
+                self.last_error = error
+                logger.warning('PLC read failed, will retry: %r', error)
+                self._data_read_thread_exit.wait(max(_sleep_time, self.MIN_RETRY_WAIT_S))
+                continue
+            self.last_error = None
             self.data.append(data_item)
             if _sleep_time > 0:
                 time.sleep(_sleep_time)
