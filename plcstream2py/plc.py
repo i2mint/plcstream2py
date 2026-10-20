@@ -92,7 +92,9 @@ class PlcReader(SourceReader):
                 # try again after the usual sleep.
                 self.last_error = error
                 logger.warning('PLC read failed, will retry: %r', error)
-                self._data_read_thread_exit.wait(max(_sleep_time, self.MIN_RETRY_WAIT_S))
+                self._data_read_thread_exit.wait(
+                    max(_sleep_time, self.MIN_RETRY_WAIT_S)
+                )
                 continue
             self.last_error = None
             self.data.append(data_item)

@@ -104,10 +104,15 @@ class _OptimizingClient(_PurePythonClient):
         self.calls.append(
             [(int(r['area']), r['db_number'], r['start'], r['size']) for r in requests]
         )
-        return 0, [
-            bytearray(self.memory[r['db_number']][r['start'] : r['start'] + r['size']])
-            for r in requests
-        ]
+        return (
+            0,
+            [
+                bytearray(
+                    self.memory[r['db_number']][r['start'] : r['start'] + r['size']]
+                )
+                for r in requests
+            ],
+        )
 
 
 @pytest.fixture(params=['legacy', 'modern-native', 'modern-pure-python'])

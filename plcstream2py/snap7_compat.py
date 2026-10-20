@@ -152,7 +152,9 @@ def _read_item_as_bytes(client, item) -> None:
     bytes are copied as the PLC sent them.
     """
     start, size = _byte_request(item)
-    _fill_item(item, client.read_area(_types.Area(item.Area), item.DBNumber, start, size))
+    _fill_item(
+        item, client.read_area(_types.Area(item.Area), item.DBNumber, start, size)
+    )
 
 
 def read_data_items(client, items):
