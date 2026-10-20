@@ -93,6 +93,23 @@ class _PurePythonClient:
         return bytearray(self.memory[db_number][start : start + size])
 
 
+class _OptimizingClient(_PurePythonClient):
+    """Fake of the 3.2+ client: dict requests to ``read_multi_vars``, answered in order."""
+
+    use_optimizer = True
+    MAX_VARS = 2
+
+    def read_multi_vars(self, requests):
+        assert len(requests) <= self.MAX_VARS
+        self.calls.append(
+            [(int(r['area']), r['db_number'], r['start'], r['size']) for r in requests]
+        )
+        return 0, [
+            bytearray(self.memory[r['db_number']][r['start'] : r['start'] + r['size']])
+            for r in requests
+        ]
+
+
 @pytest.fixture(params=['legacy', 'modern-native', 'modern-pure-python'])
 def flavour(request, monkeypatch):
     """``(name, client)`` for each snap7 flavour, with ``snap7_compat`` set up for it."""
@@ -157,6 +174,50 @@ def test_every_flavour_reads_the_same_values(flavour):
         assert client.calls == [
             [(1, 1, 1, 1), (1, 1, 0, 1), (2, 1, 3, 1), (8, 1, 8, 1), (4, 1, 12, 1)]
         ]
+
+
+def test_optimizing_client_gets_chunked_batched_byte_requests(monkeypatch):
+    with snap7_env('modern'):
+        compat = importlib.import_module('plcstream2py.snap7_compat')
+        monkeypatch.setattr(compat, '_is_pure_python_client', lambda: True)
+        client = _OptimizingClient(MEMORY)
+
+        read = _raw_reader(client).read_items(_data_items())
+
+    assert {r['key']: r['value'] for r in read} == EXPECTED
+    assert client.calls == [  # MAX_VARS=2 per call, bits addressed through their byte
+        [(0x84, 1, 0, 1), (0x84, 1, 0, 1)],
+        [(0x84, 1, 3, 1), (0x84, 1, 8, 4)],
+        [(0x84, 1, 12, 2)],
+    ]
+
+
+def test_plc_reader_survives_a_failed_poll(monkeypatch):
+    import threading
+
+    from plcstream2py.plc import PlcReader
+    from plcstream2py.snap7_compat import SNAP7_ERRORS
+
+    reader = PlcReader('127.0.0.1', items_to_read=[], rack=0, slot=0, sleep_time=0)
+    polls = []
+
+    def read_items(items):
+        polls.append(1)
+        if len(polls) == 1:
+            raise SNAP7_ERRORS[-1]('connection lost')  # the 3.x S7Error where it exists
+        if len(polls) == 3:
+            reader._data_read_thread_exit.set()
+        return [{'key': 'k', 'value': len(polls), 'bt': 0}]
+
+    monkeypatch.setattr(reader._plc_raw_reader, 'read_items', read_items)
+    monkeypatch.setattr(reader, 'MIN_RETRY_WAIT_S', 0.001)
+    thread = threading.Thread(target=reader._stream_thread)
+    thread.start()
+    thread.join(5)
+
+    assert not thread.is_alive() and len(polls) == 3
+    assert [d[0]['value'] for d in reader.data] == [2, 3]  # the failed poll is skipped
+    assert reader.last_error is None  # and cleared by the next good poll
 
 
 def test_a_bit_item_reads_exactly_one_bit(flavour):
