@@ -296,7 +296,9 @@ def _free_port():
         return sock.getsockname()[1]
 
 
-@pytest.mark.skipif(INSTALLED_SNAP7_LAYOUT != 'modern', reason='needs python-snap7 2.x or 3.x')
+@pytest.mark.skipif(
+    INSTALLED_SNAP7_LAYOUT != 'modern', reason='needs python-snap7 2.x or 3.x'
+)
 class TestAgainstSnap7Server:
     """``PlcRawRead`` against the S7 server shipped with python-snap7: the native-library
     one in 2.x, the pure-Python one in 3.x.
