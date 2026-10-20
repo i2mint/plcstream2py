@@ -10,10 +10,12 @@ tests pin down is the part that differs between ``python-snap7`` releases:
   bits are extracted here.
 
 Every flavour must produce the same values for the same memory.
-:class:`TestAgainstSnap7Server` goes further when ``python-snap7`` 3.x is installed: it
-talks to the pure-Python S7 server that ships with it, over loopback.
+:class:`TestAgainstSnap7Server` goes further when ``python-snap7`` 2.x or 3.x is installed: it
+talks to the S7 server that ships with it (native in 2.x, pure Python in 3.x), over
+loopback.
 """
 
+import ctypes
 import importlib
 import importlib.util
 import socket
@@ -289,9 +291,10 @@ def _free_port():
         return sock.getsockname()[1]
 
 
-@pytest.mark.skipif(INSTALLED_SNAP7_LAYOUT != 'modern', reason='needs python-snap7 3.x')
+@pytest.mark.skipif(INSTALLED_SNAP7_LAYOUT != 'modern', reason='needs python-snap7 2.x or 3.x')
 class TestAgainstSnap7Server:
-    """``PlcRawRead`` against the pure-Python S7 server shipped with python-snap7 3.x.
+    """``PlcRawRead`` against the S7 server shipped with python-snap7: the native-library
+    one in 2.x, the pure-Python one in 3.x.
 
     That server answers every read with byte-typed data, unlike a real PLC (which types
     bit and real answers differently), so this checks the connection, the addressing and
@@ -300,13 +303,19 @@ class TestAgainstSnap7Server:
 
     @pytest.fixture
     def server_port(self, real_snap7):
-        if not importlib.util.find_spec('snap7.s7protocol'):
-            pytest.skip('this python-snap7 has no pure-Python client and server')
         from snap7.type import SrvArea
 
         port = _free_port()
-        server = real_snap7.Server()
-        server.register_area(SrvArea.DB, 1, bytearray(MEMORY[1]))
+        try:
+            server = real_snap7.Server()  # 2.x: loads the native library
+        except Exception as exc:  # no loadable native library on this machine
+            pytest.skip(f'no usable python-snap7 server: {exc}')
+        memory = bytearray(MEMORY[1])
+        try:
+            server.register_area(SrvArea.DB, 1, memory)  # 3.x takes a bytearray
+        except TypeError:  # 2.x hands the buffer to the native library as a ctypes array
+            memory = (ctypes.c_ubyte * len(memory)).from_buffer_copy(memory)
+            server.register_area(SrvArea.DB, 1, memory)
         server.start_to('127.0.0.1', port)
         try:
             yield port
