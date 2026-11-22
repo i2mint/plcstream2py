@@ -1,0 +1,15 @@
+# plcstream2py
+
+> stream2py interface to PLC data
+
+
+## Pages in this subsection
+
+- [plcstream2py](plcstream2py.html.md): stream2py interface to Siemens S7 PLC data.
+- [plcstream2py.plc](plcstream2py.plc.html.md): A &#96;stream2py&#96; source reader for Siemens S7 PLC data.
+- [plcstream2py.raw_plc](plcstream2py.raw_plc.html.md): Thin, snap7-level access to values stored in a Siemens S7 PLC.
+- [plcstream2py.snap7_compat](plcstream2py.snap7_compat.html.md): One place that knows how &#96;python-snap7&#96; is laid out, across its major versions.
+
+## Optional
+
+- [Top-level llms.txt](../llms.txt): Complete documentation index.

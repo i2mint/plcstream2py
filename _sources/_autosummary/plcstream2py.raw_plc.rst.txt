@@ -1,0 +1,19 @@
+plcstream2py.raw\_plc
+=====================
+
+.. automodule:: plcstream2py.raw_plc
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      get_byte
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      PlcDataItem
+      PlcRawRead
+   

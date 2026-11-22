@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "built_at": "2026-11-22T19:58:32Z",
+  "package": {
+    "name": "plcstream2py",
+    "version": "0.0.7",
+    "display_name": "plcstream2py",
+    "source": "pyproject.toml"
+  },
+  "git": {
+    "available": true,
+    "commit": "db1a3c79c353ea324c62a1369aa326daf7357836",
+    "short_commit": "db1a3c7",
+    "branch": "master",
+    "tags": [],
+    "dirty": false,
+    "remote_url": "https://github.com/i2mint/plcstream2py",
+    "commit_url": "https://github.com/i2mint/plcstream2py/commit/db1a3c79c353ea324c62a1369aa326daf7357836",
+    "error": null
+  },
+  "ci": {
+    "provider": "github",
+    "repository": "i2mint/plcstream2py",
+    "sha": "db1a3c79c353ea324c62a1369aa326daf7357836",
+    "sha_in_history": true,
+    "ref": "refs/heads/master",
+    "ref_name": "master",
+    "run_id": "45063625186",
+    "run_url": "https://github.com/i2mint/plcstream2py/actions/runs/45063625186",
+    "server_url": "https://github.com"
+  },
+  "tools": {
+    "epythet": "0.2.23",
+    "sphinx": "9.1.1",
+    "docutils": "0.22.4",
+    "python": "3.12.16"
+  },
+  "config": {
+    "theme": "auto",
+    "html_theme": "furo",
+    "accent": "#753c86",
+    "mode": "auto",
+    "api_generator": "autosummary",
+    "ignore": [
+      "tests/",
+      "scrap/",
+      "examples/"
+    ],
+    "agent_outputs": true,
+    "aggregates": [
+      "md"
+    ],
+    "ai_artifacts": true,
+    "provenance": true,
+    "docs_dir": "docsrc"
+  },
+  "site": {
+    "modules_documented": 4,
+    "objects_documented": 12
+  },
+  "pypi": {
+    "checked": true,
+    "latest": "0.0.7",
+    "relation": "same",
+    "error": null
+  },
+  "reproduce": "git clone https://github.com/i2mint/plcstream2py && cd plcstream2py\ngit checkout db1a3c79c353ea324c62a1369aa326daf7357836\npip install \"epythet==0.2.23\"\nepythet quickstart . --ignore tests/ scrap/ examples/",
+  "warnings": [],
+  "alignment": {
+    "aligned": true,
+    "notes": []
+  }
+}

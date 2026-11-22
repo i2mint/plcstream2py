@@ -1,0 +1,18 @@
+plcstream2py.snap7\_compat
+==========================
+
+.. automodule:: plcstream2py.snap7_compat
+
+   
+   .. rubric:: Module Attributes
+
+   .. autosummary::
+   
+      WORD_LEN_BYTES
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      read_data_items
+   

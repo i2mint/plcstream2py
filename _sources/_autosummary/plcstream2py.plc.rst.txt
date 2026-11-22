@@ -1,0 +1,12 @@
+plcstream2py.plc
+================
+
+.. automodule:: plcstream2py.plc
+
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      PlcReader
+   
